@@ -53,7 +53,6 @@ export default function Sidebar() {
     { to: "/emergency", icon: <AlertTriangle size={20} />, label: "Emergency" },
     { to: "/hospitals", icon: <Activity size={20} />, label: "Hospitals" },
     { to: "/map", icon: <Map size={20} />, label: "Map" },
-    { to: "/messages", icon: <MessageCircle size={20} />, label: "Messages" },
     { to: "/profile", icon: <User size={20} />, label: "Profile" },
     { to: "/settings", icon: <Settings size={20} />, label: "Settings" },
   ];
@@ -63,7 +62,7 @@ export default function Sidebar() {
       <div className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Heart className="text-blood" size={24} />
-          <h1 className="font-bold text-xl">BloodConnect</h1>
+          <h1 className="font-bold text-xl">PulseConnect+</h1>
         </div>
         <p className="text-xs text-gray-500 mt-1">Emergency Support System</p>
       </div>

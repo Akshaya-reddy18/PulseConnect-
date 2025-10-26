@@ -1,6 +1,6 @@
 
-import InteractiveMap from "@/components/InteractiveMap";
+import RealMap from "@/components/RealMap";
 
 export default function Map() {
-  return <InteractiveMap />;
+  return <RealMap />;
 }

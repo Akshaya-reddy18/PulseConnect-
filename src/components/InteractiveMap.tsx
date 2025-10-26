@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Search, Phone, Building, Heart, Navigation, X } from "lucide-react";
 
+// Declare Leaflet as global
+declare global {
+  interface Window {
+    L: any;
+  }
+}
+
 interface MapMarker {
   id: string;
   name: string;
@@ -69,80 +76,132 @@ export default function InteractiveMap() {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const userMarkerRef = useRef<any>(null);
 
-  // Sample data for hospitals and blood banks with percentage-based positioning
-  const sampleMarkers: MapMarker[] = [
-    {
-      id: 'hosp-001',
-      name: 'City General Hospital',
-      address: '123 Medical Center Dr, Downtown',
-      contact: '+1-555-0123',
-      lat: 25, // Percentage from left
-      lng: 30, // Percentage from top
-      type: 'hospital',
-      available_blood_types: ['A+', 'A-', 'B+', 'O+'],
-      hours: '24/7 Emergency'
-    },
-    {
-      id: 'hosp-002',
-      name: 'Memorial Medical Center',
-      address: '456 Health Plaza, North District',
-      contact: '+1-555-0456',
-      lat: 60,
-      lng: 20,
-      type: 'hospital',
-      available_blood_types: ['A+', 'B+', 'AB+', 'O+', 'O-'],
-      hours: '6 AM - 10 PM'
-    },
-    {
-      id: 'hosp-003',
-      name: 'St. Mary\'s Hospital',
-      address: '789 Care Avenue, East Side',
-      contact: '+1-555-0789',
-      lat: 75,
-      lng: 40,
-      type: 'hospital',
-      available_blood_types: ['A+', 'A-', 'B+', 'B-', 'AB+', 'O+'],
-      hours: '24/7 Emergency'
-    },
-    {
-      id: 'bb-001',
-      name: 'Central Blood Bank',
-      address: '321 Life Street, Central',
-      contact: '+1-555-1001',
-      lat: 40,
-      lng: 50,
-      type: 'blood_bank',
-      available_blood_types: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-      hours: '8 AM - 6 PM'
-    },
-    {
-      id: 'dc-001',
-      name: 'Community Donation Center',
-      address: '654 Hope Avenue, West Side',
-      contact: '+1-555-2002',
-      lat: 20,
-      lng: 60,
-      type: 'donation_center',
-      available_blood_types: ['A+', 'B+', 'O+'],
-      hours: '9 AM - 5 PM'
-    },
-    {
-      id: 'bb-002',
-      name: 'Regional Blood Services',
-      address: '987 Vital Way, South District',
-      contact: '+1-555-3003',
-      lat: 80,
-      lng: 70,
-      type: 'blood_bank',
-      available_blood_types: ['A+', 'A-', 'B+', 'B-', 'AB+', 'O+', 'O-'],
-      hours: '7 AM - 7 PM'
-    }
-  ];
-
+  // Load markers from database
   useEffect(() => {
-    setMarkers(sampleMarkers);
+    const loadMarkers = async () => {
+      try {
+        // TODO: Replace with actual API call to get hospitals and blood banks
+        // For now, we'll use an empty array and show a message
+        setMarkers([]);
+      } catch (error) {
+        console.error('Error loading markers:', error);
+      }
+    };
+
+    loadMarkers();
   }, []);
+
+  // Initialize map
+  useEffect(() => {
+    if (mapRef.current && !mapInstance.current && window.L) {
+      // Initialize map centered on Delhi
+      mapInstance.current = window.L.map('interactive-map').setView([28.6139, 77.2090], 13);
+
+      // Add OSM tiles
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(mapInstance.current);
+
+      // Get user location
+      mapInstance.current.locate({setView: true, maxZoom: 16});
+
+      mapInstance.current.on('locationfound', function(e: any) {
+        if (userMarkerRef.current) {
+          mapInstance.current.removeLayer(userMarkerRef.current);
+        }
+        
+        userMarkerRef.current = window.L.marker(e.latlng)
+          .addTo(mapInstance.current)
+          .bindPopup("You are here")
+          .openPopup();
+        
+        window.L.circle(e.latlng, e.accuracy / 2).addTo(mapInstance.current);
+        
+        setUserLocation({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng
+        });
+      });
+
+      mapInstance.current.on('locationerror', function(e: any) {
+        console.error('Location error:', e.message);
+        // Set default location to Delhi
+        setUserLocation({ lat: 28.6139, lng: 77.2090 });
+      });
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, []);
+
+  // Add markers to map
+  useEffect(() => {
+    if (mapInstance.current && window.L) {
+      // Clear existing markers
+      markersRef.current.forEach(marker => {
+        mapInstance.current.removeLayer(marker);
+      });
+      markersRef.current = [];
+
+      // Add markers
+      markers.forEach(marker => {
+        const getMarkerIcon = (type: string) => {
+          switch (type) {
+            case 'hospital':
+              return window.L.divIcon({
+                className: 'custom-hospital-icon',
+                html: `<div class="hospital-marker">🏥</div>`,
+                iconSize: [25, 25],
+                iconAnchor: [12, 12]
+              });
+            case 'blood_bank':
+              return window.L.divIcon({
+                className: 'custom-blood-bank-icon',
+                html: `<div class="blood-bank-marker">🩸</div>`,
+                iconSize: [25, 25],
+                iconAnchor: [12, 12]
+              });
+            default:
+              return window.L.divIcon({
+                className: 'custom-donation-center-icon',
+                html: `<div class="donation-center-marker">❤️</div>`,
+                iconSize: [25, 25],
+                iconAnchor: [12, 12]
+              });
+          }
+        };
+
+        const leafletMarker = window.L.marker([marker.lat, marker.lng], { icon: getMarkerIcon(marker.type) })
+          .addTo(mapInstance.current)
+          .bindPopup(`
+            <div class="marker-popup">
+              <h3><strong>${marker.name}</strong></h3>
+              <p>${marker.address}</p>
+              <p>Contact: ${marker.contact}</p>
+              <p>Type: ${marker.type.replace('_', ' ').toUpperCase()}</p>
+              ${marker.available_blood_types ? `<p>Available: ${marker.available_blood_types.join(', ')}</p>` : ''}
+              ${marker.hours ? `<p>Hours: ${marker.hours}</p>` : ''}
+            </div>
+          `);
+
+        leafletMarker.on('click', () => {
+          setSelectedMarker(marker);
+          setShowPopup(true);
+        });
+
+        markersRef.current.push(leafletMarker);
+      });
+    }
+  }, [markers]);
 
   // Get user's current location
   const getUserLocation = () => {
@@ -153,22 +212,21 @@ export default function InteractiveMap() {
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });
+          if (mapInstance.current) {
+            mapInstance.current.setView([position.coords.latitude, position.coords.longitude], 16);
+          }
         },
         (error) => {
           console.error('Error getting location:', error);
           // Default location
-          setUserLocation({ lat: 40.7128, lng: -74.0060 });
+          setUserLocation({ lat: 28.6139, lng: 77.2090 });
         }
       );
     } else {
       // Default location
-      setUserLocation({ lat: 40.7128, lng: -74.0060 });
+      setUserLocation({ lat: 28.6139, lng: 77.2090 });
     }
   };
-
-  useEffect(() => {
-    getUserLocation();
-  }, []);
 
   const filteredMarkers = markers.filter(marker =>
     marker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -288,7 +346,7 @@ export default function InteractiveMap() {
           </Card>
         </div>
 
-        {/* Interactive Map */}
+        {/* Real Leaflet Map */}
         <div className="lg:col-span-3">
           <Card className="h-[600px]">
             <CardHeader>
@@ -300,80 +358,8 @@ export default function InteractiveMap() {
                 Click on markers to view details
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-0 h-[500px] relative overflow-hidden">
-              <div 
-                ref={mapRef}
-                className="w-full h-full relative bg-gradient-to-br from-blue-100 via-green-50 to-blue-100"
-                style={{
-                  backgroundImage: `
-                    radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
-                    radial-gradient(circle at 40% 60%, rgba(239, 68, 68, 0.1) 0%, transparent 50%)
-                  `
-                }}
-              >
-                {/* Map grid pattern */}
-                <div 
-                  className="absolute inset-0 opacity-20"
-                  style={{
-                    backgroundImage: `
-                      linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)
-                    `,
-                    backgroundSize: '20px 20px'
-                  }}
-                />
-                
-                {/* User location marker */}
-                {userLocation && (
-                  <div
-                    className="absolute w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs cursor-pointer transform -translate-x-1/2 -translate-y-1/2 animate-pulse shadow-lg"
-                    style={{
-                      left: '50%',
-                      top: '50%',
-                    }}
-                    title="Your Location"
-                  >
-                    👤
-                  </div>
-                )}
-
-                {/* Location markers */}
-                {filteredMarkers.map((marker) => (
-                  <MapMarker
-                    key={marker.id}
-                    marker={marker}
-                    onClick={() => handleMarkerClick(marker)}
-                    isSelected={selectedMarker?.id === marker.id}
-                  />
-                ))}
-
-                {/* Map overlay with instructions */}
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <MapPin className="h-4 w-4" />
-                    <span>Click markers to view details</span>
-                  </div>
-                </div>
-
-                {/* Map legend */}
-                <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span>Hospitals</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span>Blood Banks</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span>Donation Centers</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <CardContent className="p-0 h-[500px]">
+              <div id="interactive-map" ref={mapRef} className="w-full h-full"></div>
             </CardContent>
           </Card>
         </div>
@@ -510,6 +496,44 @@ export default function InteractiveMap() {
           </CardContent>
         </Card>
       )}
+
+      {/* Custom CSS for map markers */}
+      <style jsx>{`
+        .custom-hospital-icon,
+        .custom-blood-bank-icon,
+        .custom-donation-center-icon {
+          background: transparent;
+          border: none;
+        }
+        
+        .hospital-marker,
+        .blood-bank-marker,
+        .donation-center-marker {
+          width: 25px;
+          height: 25px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #3b82f6;
+          color: white;
+          font-size: 14px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          border: 2px solid white;
+        }
+        
+        .blood-bank-marker {
+          background-color: #ef4444;
+        }
+        
+        .donation-center-marker {
+          background-color: #10b981;
+        }
+        
+        .marker-popup {
+          min-width: 200px;
+        }
+      `}</style>
     </div>
   );
 }

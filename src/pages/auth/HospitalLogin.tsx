@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function HospitalLogin() {
   const [email, setEmail] = useState("");
@@ -17,19 +18,64 @@ export default function HospitalLogin() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate hospital login
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // Authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (error) {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Get hospital data using the user ID from auth
+      const { data: hospitalData, error: hospitalError } = await supabase
+        .from('hospitals')
+        .select('*')
+        .eq('id', data.user?.id)
+        .single();
+
+      if (hospitalError || !hospitalData) {
+        toast({
+          title: "Hospital Not Found",
+          description: "No hospital account found. Please register first.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Store hospital data in session storage
+      sessionStorage.setItem('hospital', JSON.stringify(hospitalData));
+      sessionStorage.setItem('userType', 'hospital');
+
       toast({
         title: "Hospital Login Successful",
-        description: "Welcome to your hospital dashboard!",
+        description: `Welcome to PulseConnect+, ${hospitalData.name}!`,
       });
+      
       navigate("/hospital/dashboard");
-    }, 1000);
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -53,7 +99,7 @@ export default function HospitalLogin() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Building className="h-8 w-8 text-medical" />
-            <h1 className="text-3xl font-bold">Hospital Portal</h1>
+            <h1 className="text-3xl font-bold">PulseConnect+</h1>
           </div>
           <p className="text-gray-500">Blood Inventory Management System</p>
         </div>

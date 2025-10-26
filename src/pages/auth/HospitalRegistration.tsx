@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Building, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,14 +38,10 @@ export default function HospitalRegistration() {
     state: '',
     district: '',
     website: '',
-    hmisDeployed: false,
-    avgOpdRegistrations: '',
-    numberOfDoctors: '',
     mobileNumber: '+91',
     landlineNumber: '',
     email: '',
-    hospitalHeadName: '',
-    captcha: ''
+    hospitalHeadName: ''
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -89,39 +84,72 @@ export default function HospitalRegistration() {
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // First, create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: 'temp_password_' + Math.random().toString(36).substring(7), // Temporary password
+        options: {
+          data: {
+            user_type: 'hospital',
+            hospital_name: formData.hospitalName
+          }
+        }
+      });
+
+      if (authError) {
+        toast({
+          title: "Registration Failed",
+          description: authError.message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Insert hospital data with updated schema
+      const { error: hospitalError } = await supabase
         .from('hospitals')
         .insert({
-          hospital_name: formData.hospitalName,
+          id: authData.user?.id || '',
+          name: formData.hospitalName,
+          email: formData.email,
+          password_hash: 'pending_verification',
+          address: `${formData.hospitalAddress}, ${formData.district}, ${formData.state}`,
+          contact: `${formData.mobileNumber}${formData.landlineNumber ? ', ' + formData.landlineNumber : ''}`,
+          contact_info: {
+            phone: formData.mobileNumber,
+            landline: formData.landlineNumber,
+            address: formData.hospitalAddress,
+            website: formData.website
+          },
           hospital_type: formData.hospitalType,
           government_category: formData.governmentCategory,
           hospital_address: formData.hospitalAddress,
           state: formData.state,
           district: formData.district,
           website: formData.website,
-          hmis_solution_deployed: formData.hmisDeployed,
-          avg_opd_registrations: parseInt(formData.avgOpdRegistrations) || null,
-          number_of_doctors: parseInt(formData.numberOfDoctors) || null,
           mobile_number: formData.mobileNumber,
           landline_number: formData.landlineNumber,
-          email: formData.email,
-          hospital_head_name: formData.hospitalHeadName
+          hospital_head_name: formData.hospitalHeadName,
+          is_verified: false,
+          is_active: true
         });
 
-      if (error) {
+      if (hospitalError) {
         toast({
           title: "Registration Failed",
-          description: error.message,
+          description: hospitalError.message,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Registration Successful",
-          description: "Your hospital registration has been submitted for review.",
+          title: "Registration Submitted",
+          description: "Please check your email and click the verification link to complete your registration.",
         });
         navigate('/auth/hospital-login');
       }
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
@@ -238,42 +266,6 @@ export default function HospitalRegistration() {
                   onChange={(e) => handleInputChange('website', e.target.value)}
                   placeholder="http://example.com/"
                 />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="hmisDeployed">HMIS Solution deployed</Label>
-                  <p className="text-sm text-gray-500">Hospital Management Information System</p>
-                </div>
-                <Switch 
-                  id="hmisDeployed" 
-                  checked={formData.hmisDeployed}
-                  onCheckedChange={(checked) => handleInputChange('hmisDeployed', checked)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="avgOpdRegistrations">Average OPD Registrations per day</Label>
-                  <Input
-                    id="avgOpdRegistrations"
-                    type="number"
-                    value={formData.avgOpdRegistrations}
-                    onChange={(e) => handleInputChange('avgOpdRegistrations', e.target.value)}
-                    placeholder="Number of OPD Registrations"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="numberOfDoctors">Number of Doctors</Label>
-                  <Input
-                    id="numberOfDoctors"
-                    type="number"
-                    value={formData.numberOfDoctors}
-                    onChange={(e) => handleInputChange('numberOfDoctors', e.target.value)}
-                    placeholder="Number of Doctors"
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

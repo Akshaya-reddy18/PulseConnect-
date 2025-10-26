@@ -31,9 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isGuest, setIsGuest] = useState<boolean>(false);
 
   useEffect(() => {
+    console.log('AuthContext: Setting up auth state listener');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('AuthContext: Auth state changed', { event, session });
         setSession(session);
         setUser(session?.user ?? null);
         // If a real session exists, ensure guest is disabled
@@ -47,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('AuthContext: Initial session check', { session });
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -55,12 +59,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // Restore guest session if present
         const guest = localStorage.getItem("guest_session");
+        console.log('AuthContext: Guest session check', { guest });
         setIsGuest(guest === "true");
       }
       setLoading(false);
+    }).catch((error) => {
+      console.error('AuthContext: Error getting session', error);
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('AuthContext: Cleaning up subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {

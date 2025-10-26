@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MapPin, Phone, Search, MessageCircle } from "lucide-react";
-import ChatModal from "@/components/ChatModal";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sampleDonors } from "@/data/sampleData";
@@ -27,8 +26,6 @@ export default function DonorSearch() {
   const [maxDistance, setMaxDistance] = useState([10]);
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
   const { toast } = useToast();
-  const [chatOpen, setChatOpen] = useState(false);
-  const [conversationId, setConversationId] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -119,10 +116,10 @@ export default function DonorSearch() {
   };
 
   const handleContact = (donor: Donor) => {
-    const cid = `${Date.now()}-${donor.id}`;
-    setConversationId(cid);
-    setChatOpen(true);
-    toast({ title: "Opening chat", description: `Contacting ${donor.name}` });
+    toast({
+      title: "Contact Information",
+      description: `Contact ${donor.name} at ${donor.phone || 'Phone number not available'}`,
+    });
   };
 
   return (
@@ -255,7 +252,7 @@ export default function DonorSearch() {
                   onClick={() => handleContact(donor)}
                   disabled={donor.status !== "Available"}
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <Phone className="h-4 w-4" />
                   Contact Donor
                 </Button>
               </CardFooter>
@@ -268,7 +265,6 @@ export default function DonorSearch() {
         )}
       </div>
     </div>
-    <ChatModal open={chatOpen} onClose={()=>setChatOpen(false)} conversationId={conversationId} senderId="hospital" receiverId="donor" />
     </>
   );
 }
